@@ -5,17 +5,24 @@ import { HeatBadge } from './HeatBadge';
 
 interface PlaceCardProps {
   place: Place;
+  isSelected?: boolean;
   onCheckIn: (id: string) => void;
   onPostVideo: (id: string) => void;
+  onSelect?: (id: string) => void;
 }
 
-export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onCheckIn, onPostVideo }) => {
+export const PlaceCard: React.FC<PlaceCardProps> = ({ place, isSelected, onCheckIn, onPostVideo, onSelect }) => {
   const isPeak = place.heatStatus === PlaceHeat.EXPLODINDO;
 
   return (
-    <div className={`group relative p-6 rounded-[2rem] border transition-all duration-500 glass ${
-      isPeak ? 'border-zinc-700/50 bg-zinc-900/30' : 'border-zinc-800/40'
-    }`}>
+    <div 
+      onClick={() => onSelect?.(place.id)}
+      className={`group relative p-6 rounded-[2rem] border transition-all duration-500 cursor-pointer glass ${
+        isSelected 
+          ? 'border-zinc-100 bg-zinc-800/40 ring-1 ring-zinc-100/20' 
+          : (isPeak ? 'border-zinc-700/50 bg-zinc-900/30 hover:border-zinc-600' : 'border-zinc-800/40 hover:border-zinc-700')
+      }`}
+    >
       <div className="flex justify-between items-start mb-6">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -44,21 +51,25 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onCheckIn, onPostVi
 
       <div className="flex gap-3">
         <button 
-          onClick={() => onCheckIn(place.id)}
-          className="flex-1 py-4 rounded-2xl bg-zinc-100 text-zinc-950 font-bold text-xs tracking-widest uppercase hover:bg-white transition-colors active:scale-[0.98]"
+          onClick={(e) => { e.stopPropagation(); onCheckIn(place.id); }}
+          className={`flex-1 py-4 rounded-2xl font-bold text-xs tracking-widest uppercase transition-all active:scale-[0.98] ${
+            isSelected ? 'bg-white text-zinc-950 shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-zinc-100 text-zinc-950 hover:bg-white'
+          }`}
         >
           Check-in
         </button>
         <button 
-          onClick={() => onPostVideo(place.id)}
+          onClick={(e) => { e.stopPropagation(); onPostVideo(place.id); }}
           className="flex-1 py-4 rounded-2xl border border-zinc-700 text-zinc-100 font-bold text-xs tracking-widest uppercase hover:bg-zinc-800 transition-colors active:scale-[0.98]"
         >
           Post Live
         </button>
       </div>
 
-      {isPeak && (
-        <div className="absolute top-4 right-4 -z-10 blur-3xl w-24 h-24 bg-rose-500/10 rounded-full" />
+      {(isPeak || isSelected) && (
+        <div className={`absolute top-4 right-4 -z-10 blur-3xl w-24 h-24 rounded-full transition-colors duration-700 ${
+          isSelected ? 'bg-zinc-100/5' : 'bg-rose-500/10'
+        }`} />
       )}
     </div>
   );

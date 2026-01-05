@@ -5,9 +5,11 @@ import { INITIAL_USER, MOCK_PLACES, INITIAL_MISSIONS, MOCK_POSTS } from './const
 import { PlaceCard } from './components/PlaceCard';
 import { MapView } from './components/MapView';
 import { PostCard } from './components/PostCard';
+import { Login } from './components/Login';
 import { getNightStrategy } from './geminiService';
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<User>(INITIAL_USER);
   const [places, setPlaces] = useState<Place[]>(MOCK_PLACES);
   const [posts, setPosts] = useState<Post[]>(MOCK_POSTS);
@@ -17,8 +19,53 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<{id: number, msg: string}[]>([]);
   const [rankCategory, setRankCategory] = useState<'users' | 'places'>('users');
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+
+  // Carregar sessão existente
+  useEffect(() => {
+    const savedUser = localStorage.getItem('ferveu_session');
+    if (savedUser) {
+      const parsed = JSON.parse(savedUser);
+      setUser(prev => ({ ...prev, name: parsed.name }));
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = (name: string) => {
+    const newUser = { ...user, name };
+    setUser(newUser);
+    localStorage.setItem('ferveu_session', JSON.stringify({ name }));
+    setIsAuthenticated(true);
+    addNotification(`Bem-vindo, ${name}!`);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('ferveu_session');
+    setIsAuthenticated(false);
+  };
+
+  // Monitorar Geolocalização Real
+  useEffect(() => {
+    if (!isAuthenticated || !navigator.geolocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      },
+      (error) => {
+        console.error("Error obtaining location", error);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     const interval = setInterval(() => {
       setPlaces(prev => prev.map(p => {
         const decayAmount = p.heatStatus === PlaceHeat.EXPLODINDO ? 2 : 1;
@@ -35,16 +82,17 @@ const App: React.FC = () => {
       }));
     }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     const fetchStrategy = async () => {
       const activeStr = places.map(p => `${p.name} (${p.heatStatus})`).join(', ');
       const strategy = await getNightStrategy(user.name, user.level, activeStr);
       setNightStrategy(strategy);
     };
     fetchStrategy();
-  }, [user.level]);
+  }, [user.level, isAuthenticated]);
 
   const addNotification = (msg: string) => {
     const id = Date.now();
@@ -90,7 +138,7 @@ const App: React.FC = () => {
     setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p));
   };
 
-  const onSelectPlaceFromMap = (id: string) => {
+  const onSelectPlace = (id: string) => {
     setSelectedPlaceId(id);
     const element = document.getElementById(`place-${id}`);
     if (element) {
@@ -98,8 +146,12 @@ const App: React.FC = () => {
     }
   };
 
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 pb-32 max-w-md mx-auto relative">
+    <div className="min-h-screen bg-[#050505] text-zinc-100 pb-32 max-w-md mx-auto relative animate-in fade-in duration-1000">
       <div className="fixed top-6 left-0 right-0 z-[60] px-6 pointer-events-none">
         {notifications.map((n) => (
           <div key={n.id} className="bg-white text-zinc-950 px-6 py-3 rounded-2xl text-[11px] font-bold tracking-widest uppercase text-center shadow-2xl animate-in slide-in-from-top-4 fade-in duration-500">
@@ -109,11 +161,14 @@ const App: React.FC = () => {
       </div>
 
       <header className="sticky top-0 z-50 bg-[#050505]/80 backdrop-blur-2xl p-6 border-b border-zinc-900/50 flex justify-between items-end">
-        <div>
+        <div onClick={() => setSelectedPlaceId(null)} className="cursor-pointer group">
           <h1 className="font-display text-xl font-bold tracking-[-0.04em] text-white">
             FERVEU<span className="text-rose-500 ml-0.5">.</span>
           </h1>
-          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mt-1">{user.level}</p>
+          <div className="flex items-center gap-2 mt-1">
+             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">{user.level}</p>
+             <button onClick={(e) => { e.stopPropagation(); handleLogout(); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-rose-500 font-black uppercase tracking-widest">Sair</button>
+          </div>
         </div>
         <div className="text-right">
           <span className="text-sm font-display font-medium text-zinc-400">{user.xp} <span className="text-[10px] uppercase opacity-50">PTS</span></span>
@@ -135,24 +190,31 @@ const App: React.FC = () => {
           <div className="space-y-10">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-display font-bold tracking-tight">O Mapa</h2>
+                <h2 className="text-3xl font-display font-bold tracking-tight">O Radar</h2>
                 <div className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900/40 px-3 py-1.5 rounded-full border border-zinc-800">
                   <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" />
-                  Live Vibe
+                  Realtime Heat
                 </div>
               </div>
-              <MapView places={places} onSelectPlace={onSelectPlaceFromMap} />
+              <MapView 
+                places={places} 
+                onSelectPlace={onSelectPlace} 
+                selectedId={selectedPlaceId}
+                userLocation={userLocation}
+              />
             </div>
 
             <div className="space-y-6">
               <div className="flex justify-between items-baseline mb-4">
-                <h2 className="text-xl font-display font-bold tracking-tight">Hotspots Recentes</h2>
-                <span className="text-[10px] font-bold text-zinc-500 uppercase">São Paulo / Br</span>
+                <h2 className="text-xl font-display font-bold tracking-tight">Hotspots Próximos</h2>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase">Detectados Agora</span>
               </div>
               {places.sort((a, b) => b.heatValue - a.heatValue).map(place => (
                 <div key={place.id} id={`place-${place.id}`} className="transition-transform duration-300">
                   <PlaceCard 
-                    place={place} 
+                    place={place}
+                    isSelected={selectedPlaceId === place.id}
+                    onSelect={setSelectedPlaceId}
                     onCheckIn={(id) => handleAction('checkin', id)}
                     onPostVideo={(id) => handleAction('post', id)}
                   />
@@ -195,7 +257,7 @@ const App: React.FC = () => {
               {(rankCategory === 'users' ? [
                 { name: 'Gui Noite', score: 4890, level: 'Incendiário' },
                 { name: 'Ana Rave', score: 3210, level: 'Incendiário' },
-                { name: 'Leo Rolê (You)', score: user.xp, level: user.level },
+                { name: user.name + ' (You)', score: user.xp, level: user.level },
               ] : places).map((r: any, i) => (
                 <div key={i} className="flex items-center gap-5 p-5 rounded-3xl glass hover:bg-zinc-900/40 transition-colors">
                   <span className="font-display text-xl text-zinc-700 w-4">{i + 1}</span>
