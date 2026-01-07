@@ -1,0 +1,8 @@
+{
+  "name": "Ferveu - Real-Time Nightlife Gamification",
+  "description": "A gamified social platform for nightlife, incentivizing real-time check-ins and live posts through status levels, heat maps, and night missions.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
