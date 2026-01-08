@@ -45,6 +45,14 @@ export const MapView: React.FC<MapViewProps> = ({ places, onSelectPlace, selecte
       });
     }
 
+    // Se a localização do usuário carregar depois do mapa, centralizar nele
+    if (userLocation && mapRef.current) {
+      // Opcional: só centralizar se não estiver focado em um lugar
+      if (!selectedId) {
+        mapRef.current.setCenter(userLocation);
+      }
+    }
+
     // Limpar marcadores antigos
     Object.values(markersRef.current).forEach((m: any) => m.setMap(null));
     markersRef.current = {};
@@ -70,7 +78,7 @@ export const MapView: React.FC<MapViewProps> = ({ places, onSelectPlace, selecte
     places.forEach((place) => {
       const isPeak = place.heatStatus === PlaceHeat.EXPLODINDO;
       const color = isPeak ? '#f43f5e' : (place.heatStatus === PlaceHeat.FERVENDO ? '#f59e0b' : '#a1a1aa');
-      
+
       const marker = new google.maps.Marker({
         position: place.location,
         map: mapRef.current,
@@ -101,12 +109,12 @@ export const MapView: React.FC<MapViewProps> = ({ places, onSelectPlace, selecte
   return (
     <div className="relative w-full h-[400px] bg-zinc-950 rounded-[2.5rem] border border-zinc-900 overflow-hidden premium-shadow">
       <div ref={containerRef} className="w-full h-full" />
-      
+
       <div className="absolute top-6 left-6 z-10 pointer-events-none">
-         <div className="glass px-3 py-1.5 rounded-full text-[9px] font-black text-white uppercase tracking-widest flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-            Live Google Radar
-         </div>
+        <div className="glass px-3 py-1.5 rounded-full text-[9px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+          Live Google Radar
+        </div>
       </div>
     </div>
   );

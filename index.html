@@ -1,14 +1,17 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ferveu - Real-time Nightlife</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=Space+Grotesk:wght@300;500;700&display=swap"
+        rel="stylesheet">
     <!-- Google Maps API with Places Library -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE&libraries=places"></script>
+    <script
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD2ORiFEj_GU2Uw20D5X_OGRn6RsfE28zQ&libraries=places"></script>
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
@@ -18,35 +21,60 @@
             overflow-x: hidden;
             letter-spacing: -0.01em;
         }
+
         .font-display {
             font-family: 'Space Grotesk', sans-serif;
         }
+
         .grain {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
             z-index: 99;
             opacity: 0.03;
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3BaseFilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/baseFilter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
+
         .glass {
             background: rgba(255, 255, 255, 0.03);
             backdrop-filter: blur(12px);
             border: 0.5px solid rgba(255, 255, 255, 0.1);
         }
+
         .premium-shadow {
             box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
         }
+
         /* Custom Google Maps Styling to force Dark Mode */
-        .gm-style iframe + div { border:none!important; }
-        .gm-style-cc { display:none!important; }
-        img[src*="gstatic.com/iconfont/codepage/res/libraries/widgets/navigation/images/"] { display:none; }
-        
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .gm-style iframe+div {
+            border: none !important;
+        }
+
+        .gm-style-cc {
+            display: none !important;
+        }
+
+        img[src*="gstatic.com/iconfont/codepage/res/libraries/widgets/navigation/images/"] {
+            display: none;
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 10px;
+        }
     </style>
-<script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "react/": "https://esm.sh/react@^19.2.3/",
@@ -56,11 +84,13 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
+    <link rel="stylesheet" href="/index.css">
 </head>
+
 <body>
     <div class="grain"></div>
     <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
+    <script type="module" src="/index.tsx"></script>
 </body>
+
 </html>

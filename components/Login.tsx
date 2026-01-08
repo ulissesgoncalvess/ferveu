@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface LoginProps {
   onLogin: (name: string, email: string) => void;
@@ -9,16 +9,51 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    setErrorMsg(null);
+    if (!email.trim() || !password.trim()) return;
+    if (isRegister && !name.trim()) return;
 
     setIsAuthenticating(true);
-    setTimeout(() => {
-      onLogin(name, email || `${name.toLowerCase()}@ferveu.app`);
-    }, 2000);
+
+    try {
+      if (isRegister) {
+        // Sign Up
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: name,
+              avatar_url: `https://api.dicebear.com/7.x/shapes/svg?seed=${name}`,
+            }
+          }
+        });
+        if (error) throw error;
+        if (data.user) {
+          onLogin(data.user.user_metadata.full_name, data.user.email!);
+        }
+      } else {
+        // Sign In
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        if (error) throw error;
+        if (data.user) {
+          onLogin(data.user.user_metadata.full_name || 'Usuário', data.user.email!);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'Erro ao autenticar. Tente novamente.');
+      setIsAuthenticating(false);
+    }
   };
 
   return (
@@ -37,38 +72,57 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         {!isAuthenticating ? (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="group relative">
-              <label className="absolute -top-2 left-4 px-1 bg-[#050505] text-[9px] font-black text-zinc-500 uppercase tracking-widest z-10">
-                Nome de Usuário
-              </label>
-              <input
-                autoFocus
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Leo Rolê"
-                className="w-full bg-transparent border border-zinc-800 rounded-2xl px-6 py-5 text-white placeholder:text-zinc-700 focus:outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/5 transition-all font-medium"
-              />
-            </div>
+            {errorMsg && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-xs font-bold text-center mb-4">
+                {errorMsg}
+              </div>
+            )}
 
             {isRegister && (
-              <div className="group relative animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="group relative">
                 <label className="absolute -top-2 left-4 px-1 bg-[#050505] text-[9px] font-black text-zinc-500 uppercase tracking-widest z-10">
-                  E-mail
+                  Nome Completo
                 </label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex: Leo Rolê"
                   className="w-full bg-transparent border border-zinc-800 rounded-2xl px-6 py-5 text-white placeholder:text-zinc-700 focus:outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/5 transition-all font-medium"
                 />
               </div>
             )}
 
+            <div className="group relative">
+              <label className="absolute -top-2 left-4 px-1 bg-[#050505] text-[9px] font-black text-zinc-500 uppercase tracking-widest z-10">
+                E-mail
+              </label>
+              <input
+                autoFocus
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="w-full bg-transparent border border-zinc-800 rounded-2xl px-6 py-5 text-white placeholder:text-zinc-700 focus:outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/5 transition-all font-medium"
+              />
+            </div>
+
+            <div className="group relative">
+              <label className="absolute -top-2 left-4 px-1 bg-[#050505] text-[9px] font-black text-zinc-500 uppercase tracking-widest z-10">
+                Senha
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="********"
+                className="w-full bg-transparent border border-zinc-800 rounded-2xl px-6 py-5 text-white placeholder:text-zinc-700 focus:outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/5 transition-all font-medium"
+              />
+            </div>
+
             <button
               type="submit"
-              disabled={!name.trim()}
+              disabled={!email.trim() || !password.trim()}
               className="w-full bg-white text-black font-bold py-5 rounded-2xl uppercase text-[11px] tracking-[0.2em] hover:bg-zinc-200 transition-all active:scale-[0.98] disabled:opacity-30 mt-4"
             >
               {isRegister ? 'Criar Conta' : 'Acessar Radar'}
@@ -76,14 +130,18 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
             <button
               type="button"
-              onClick={() => setIsRegister(!isRegister)}
+              onClick={() => {
+                setIsRegister(!isRegister);
+                setErrorMsg(null);
+                setIsAuthenticating(false);
+              }}
               className="w-full py-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest hover:text-zinc-300 transition-colors"
             >
-              {isRegister ? 'Já tenho acesso' : 'Quero me cadastrar'}
+              {isRegister ? 'Já tenho conta' : 'Criar nova conta'}
             </button>
 
             <p className="text-center text-[9px] text-zinc-600 font-bold uppercase tracking-widest leading-relaxed mt-6">
-              Ao entrar, você concorda em compartilhar sua <br/> vibe em tempo real com a comunidade.
+              Ao entrar, você concorda em compartilhar sua <br /> vibe em tempo real com a comunidade.
             </p>
           </form>
         ) : (
@@ -94,9 +152,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
             <div className="text-center">
               <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] animate-pulse">
-                {isRegister ? 'CRIANDO PERFIL...' : 'Sincronizando Pulso...'}
+                {isRegister ? 'CRIANDO CIDADÂO...' : 'IDENTIFICANDO...'}
               </p>
-              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-2 italic">Acessando hotspots em São Paulo</p>
+              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-2 italic">Acessando banco de dados...</p>
             </div>
           </div>
         )}

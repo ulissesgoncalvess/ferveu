@@ -17,15 +17,15 @@ const App: React.FC = () => {
     ...INITIAL_USER,
     joinedAt: new Date().toISOString()
   });
-  const [places, setPlaces] = useState<Place[]>(MOCK_PLACES);
+  const [places, setPlaces] = useState<Place[]>([]);
   const [posts, setPosts] = useState<Post[]>(MOCK_POSTS);
   const [missions, setMissions] = useState<Mission[]>(INITIAL_MISSIONS);
   const [view, setView] = useState<'map' | 'feed' | 'ranking' | 'missions' | 'profile'>('map');
   const [nightStrategy, setNightStrategy] = useState<string>("Buscando a vibe da cidade...");
-  const [notifications, setNotifications] = useState<{id: number, msg: string}[]>([]);
+  const [notifications, setNotifications] = useState<{ id: number, msg: string }[]>([]);
   const [rankCategory, setRankCategory] = useState<'users' | 'places'>('users');
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
 
   // Carregar sessão
   useEffect(() => {
@@ -37,67 +37,95 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const addNotification = (msg: string) => {
+    const id = Date.now();
+    setNotifications(prev => [{ id, msg }, ...prev].slice(0, 1));
+    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 3000);
+  };
+
   // Busca Real por Locais Próximos (Google Places)
-  const fetchRealPlaces = useCallback((location: {lat: number, lng: number}) => {
-    if (typeof google === 'undefined' || !google.maps.places) return;
+  const fetchRealPlaces = useCallback(async (location: { lat: number, lng: number }) => {
+    if (typeof google === 'undefined') {
+      console.warn("Google Maps API not loaded yet.");
+      return;
+    }
 
-    const mapDiv = document.createElement('div');
-    const service = new google.maps.places.PlacesService(mapDiv);
-    
-    const request = {
-      location: new google.maps.LatLng(location.lat, location.lng),
-      radius: '2000',
-      type: ['bar', 'night_club', 'restaurant']
-    };
+    try {
+      // Importar a nova biblioteca de Places (Modern API)
+      const { Place: GooglePlace } = await google.maps.importLibrary("places") as any;
 
-    service.nearbySearch(request, (results: any[], status: any) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-        const realPlaces: Place[] = results.slice(0, 10).map((result, index) => {
-          const popularity = result.user_ratings_total || Math.floor(Math.random() * 200);
-          const rating = result.rating || 4;
+      const request = {
+        fields: ['displayName', 'location', 'businessStatus', 'id', 'types', 'rating', 'userRatingCount'],
+        locationRestriction: {
+          center: location,
+          radius: 2000,
+        },
+        includedPrimaryTypes: ['bar', 'night_club', 'restaurant'],
+        maxResultCount: 20
+      };
+
+      const { places } = await GooglePlace.searchNearby(request);
+
+      if (places && places.length > 0) {
+        const realPlaces: Place[] = places.map((place: any) => {
+          const popularity = place.userRatingCount || Math.floor(Math.random() * 200);
+          const rating = place.rating || 4;
           const heatValue = Math.min(100, Math.floor((popularity / 500) * 50 + (rating * 10)));
-          
+
           let heatStatus = PlaceHeat.MORNO;
           if (heatValue > 80) heatStatus = PlaceHeat.EXPLODINDO;
           else if (heatValue > 50) heatStatus = PlaceHeat.FERVENDO;
 
           return {
-            id: result.place_id,
-            name: result.name,
-            category: result.types[0].replace('_', ' '),
+            id: place.id,
+            name: place.displayName,
+            category: place.types?.[0]?.replace('_', ' ') || 'Local',
             heatValue,
             heatStatus,
             checkInCount: popularity,
             videoCount: Math.floor(popularity / 10),
             lastUpdate: Date.now(),
             location: {
-              lat: result.geometry.location.lat(),
-              lng: result.geometry.location.lng()
+              lat: place.location.lat(),
+              lng: place.location.lng()
             },
             trend: Math.random() > 0.5 ? 'up' : 'stable'
           };
         });
         setPlaces(realPlaces);
+        addNotification(`${realPlaces.length} locais encontrados!`);
+      } else {
+        addNotification("Nenhum hotspot encontrado na área.");
       }
-    });
-  }, []);
+    } catch (error: any) {
+      console.error("New Places API Error:", error);
+      // Fallback or specific error handling
+      addNotification(`Erro ao buscar locais: ${error.message || 'Verifique o console'}`);
+    }
+  }, [addNotification]);
 
   // Monitorar GPS e Disparar Busca
   useEffect(() => {
-    if (!isAuthenticated || !navigator.geolocation) return;
+    if (!isAuthenticated) return;
 
-    const watchId = navigator.geolocation.watchPosition(
+    if (!navigator.geolocation) {
+      addNotification("Seu navegador não suporta geolocalização.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
       (position) => {
         const loc = { lat: position.coords.latitude, lng: position.coords.longitude };
         setUserLocation(loc);
         fetchRealPlaces(loc);
       },
-      (error) => console.error(error),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      (error) => {
+        console.error("Erro GPS:", error);
+        addNotification(`Erro no GPS: ${error.message}. Verifique as permissões.`);
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [isAuthenticated, fetchRealPlaces]);
+  }, [isAuthenticated, fetchRealPlaces, addNotification]);
 
   // Estratégia da Noite via Gemini
   useEffect(() => {
@@ -124,11 +152,7 @@ const App: React.FC = () => {
     setView('map');
   };
 
-  const addNotification = (msg: string) => {
-    const id = Date.now();
-    setNotifications(prev => [{id, msg}, ...prev].slice(0, 1));
-    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 3000);
-  };
+
 
   const handleAction = (type: 'checkin' | 'post', placeId: string) => {
     const xpGain = type === 'checkin' ? 50 : 120;
@@ -188,12 +212,22 @@ const App: React.FC = () => {
           <div className="space-y-10">
             <div className="space-y-4">
               <h2 className="text-3xl font-display font-bold">O Radar Real</h2>
-              <MapView 
-                places={places} 
-                onSelectPlace={setSelectedPlaceId} 
-                selectedId={selectedPlaceId}
-                userLocation={userLocation}
-              />
+              {!userLocation ? (
+                <div className="w-full h-[400px] bg-zinc-900/50 rounded-[2.5rem] flex items-center justify-center border border-zinc-800 animate-pulse">
+                  <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs">Buscando satélites...</p>
+                    <p className="text-zinc-600 text-[10px] mt-2">Permita o acesso à localização</p>
+                  </div>
+                </div>
+              ) : (
+                <MapView
+                  places={places}
+                  onSelectPlace={setSelectedPlaceId}
+                  selectedId={selectedPlaceId}
+                  userLocation={userLocation}
+                />
+              )}
             </div>
 
             <div className="space-y-6">
@@ -203,7 +237,7 @@ const App: React.FC = () => {
               ) : (
                 places.map(place => (
                   <div key={place.id} id={`place-${place.id}`}>
-                    <PlaceCard 
+                    <PlaceCard
                       place={place}
                       isSelected={selectedPlaceId === place.id}
                       onSelect={setSelectedPlaceId}
@@ -225,22 +259,22 @@ const App: React.FC = () => {
         )}
 
         {view === 'profile' && <ProfileView user={user} onLogout={handleLogout} />}
-        
+
         {view === 'ranking' && (
           <div className="animate-in fade-in">
-             <h2 className="text-3xl font-display font-bold mb-8">Hall da Fama</h2>
-             <div className="space-y-4">
-                {places.slice(0, 5).map((p, i) => (
-                  <div key={p.id} className="flex items-center gap-5 p-5 rounded-[1.5rem] glass">
-                    <span className="text-zinc-700 font-display text-xl">{i+1}</span>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-sm">{p.name}</h4>
-                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest">{p.heatStatus}</p>
-                    </div>
-                    <span className="text-rose-500 font-display font-bold">{p.heatValue}%</span>
+            <h2 className="text-3xl font-display font-bold mb-8">Hall da Fama</h2>
+            <div className="space-y-4">
+              {places.slice(0, 5).map((p, i) => (
+                <div key={p.id} className="flex items-center gap-5 p-5 rounded-[1.5rem] glass">
+                  <span className="text-zinc-700 font-display text-xl">{i + 1}</span>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-sm">{p.name}</h4>
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-widest">{p.heatStatus}</p>
                   </div>
-                ))}
-             </div>
+                  <span className="text-rose-500 font-display font-bold">{p.heatValue}%</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </main>
